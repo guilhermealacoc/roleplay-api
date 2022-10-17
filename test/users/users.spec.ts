@@ -1,7 +1,10 @@
-import { UserFactory } from './../../database/factories/index'
+import { Response } from '@adonisjs/core/build/standalone'
+import Database from '@ioc:Adonis/Lucid/Database'
 import test from 'japa'
 import { Assert } from 'japa/build/src/Assert'
 import supertest from 'supertest'
+
+import { UserFactory } from './../../database/factories/index'
 
 const BASE_URL = `http://${process.env.HOST}:${process.env.PORT}`
 
@@ -17,7 +20,7 @@ const BASE_URL = `http://${process.env.HOST}:${process.env.PORT}`
 }
 */
 
-test.group('User', () => {
+test.group('User', (group) => {
   test('it should create an user', async (assert) => {
     const userPayload = {
       email: 'teste@test.com',
@@ -45,5 +48,46 @@ test.group('User', () => {
         password: 'test',
       })
       .expect(409)
+
+    console.log({ body })
+    assert.exists(body.message)
+    assert.exists(body.code)
+    assert.exists(body.status)
+    assert.include(body.message, 'email')
+    assert.equal(body.code, 'BAD_REQUEST')
+    assert.equal(body.status, 409)
+  })
+
+  test('it should return return 409 when email is already in use', async (assert) => {
+    const { username } = await UserFactory.create()
+    const { body } = await supertest(BASE_URL)
+      .post('/users')
+      .send({
+        username,
+        email: 'tste@teste.com',
+        password: 'test',
+      })
+      .expect(409)
+
+    console.log({ body })
+    assert.exists(body.message)
+    assert.exists(body.code)
+    assert.exists(body.status)
+    assert.include(body.message, 'username')
+    assert.equal(body.code, 'BAD_REQUEST')
+    assert.equal(body.status, 409)
+  })
+
+  test.only('it should return 422 when required data is not provided', async (assert) => {
+    const { body } = await supertest(BASE_URL).post('/users').send({}).expect(422)
+    assert.equal(body.code, 'BAD_REQUEST')
+    assert.equal(body.status, 422)
+  })
+
+  group.beforeEach(async () => {
+    await Database.beginGlobalTransaction()
+  })
+  group.afterEach(async () => {
+    await Database.rollbackGlobalTransaction()
   })
 })
